@@ -1,0 +1,24 @@
+project: java-grinder
+target: java-grinder
+
+# File-input (CLI) target: feed the fuzz bytes as a Java .class file to java_grinder — the tool that
+# reads JVM bytecode and emits assembly for a retro CPU. The bytecode parser (common/JavaClass,
+# common/JavaCompiler) and the per-platform code generator both run on the input. Not libFuzzer: the
+# natural fuzz surface is the tool on a .class file, so the built ELF is its own reproducer. @@ is the
+# input-file placeholder.
+#
+# Ported from the old integration's single target (old: /java_grinder @@ out amiga); the binary now
+# lives at /mayhem/java_grinder. Args are <class> <outfile> <platform>: java_grinder reads @@ as the
+# .class, writes the generated assembly to /tmp/out (discardable scratch), targeting the `amiga`
+# platform. A valid .class compiles to exit 0 (passing test); malformed bytecode exercises the reader.
+#
+# The scratch output MUST be a writable path (/tmp, a tmpfs). Mayhem mounts the commit image rootfs
+# READ-ONLY during dynamic-analysis/coverage collection, so an absolute output under the baked image
+# dir (e.g. /mayhem/out) can't be opened -> java_grinder gets a NULL FILE* -> the sanitized build
+# aborts (UBSan, Generator.cxx) on EVERY input -> 0 edges covered -> "Run Failed". The original wrote
+# a RELATIVE `out` into Mayhem's writable working dir; /tmp/out is the explicit, robust equivalent.
+cmds:
+  - cmd: /mayhem/java_grinder @@ /tmp/out amiga
+testsuite:
+  - https://$MAYHEM_DOMAIN/$MAYHEM_PROJECT/$MAYHEM_TARGET/testsuite.tar
+  - file://mayhem/java-grinder/testsuite
