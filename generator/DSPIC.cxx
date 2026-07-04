@@ -1307,8 +1307,13 @@ int DSPIC::ioport_setPinAsHighZ_I(int port)
 int DSPIC::ioport_setPinAsHighZ_I(int port, int const_val)
 {
   if (const_val < 0 || const_val > 15) { return -1; }
-  fprintf(out, "  bclr LAT%c, #%d\n", port + 'A', const_val);
-  fprintf(out, "  bset TRIS%c, #%d\n", port + 'A', const_val);
+  fprintf(out,
+    "  ;; ioport_setPinAsHighZ_I(%d, %d)\n"
+    "  bclr LAT%c, #%d\n"
+    "  bset TRIS%c, #%d\n",
+    port, const_val,
+    port + 'A', const_val,
+    port + 'A', const_val);
   return 0;
 }
 
@@ -1670,8 +1675,10 @@ int DSPIC::adc_enable()
     "  mov #3 << 5, w0\n"
     "  mov w0, ADCON1H\n"
     "  mov #0x7f, w0\n"
+    //"  mov #0x0f, w0\n"
     "  mov w0, ADCON2L\n"
     "  mov #0x3ff, w0\n"
+    //"  mov #0x0ff, w0\n"
     "  mov w0, ADCON2H\n"
     "  mov #0x4000, w0\n"
     "  mov w0, ADCON3H\n"
@@ -1723,6 +1730,7 @@ int DSPIC::adc_setChannel_I(int channel)
     case 12: port_name = 'C'; port_num = 0; break;
     case 13: port_name = 'C'; port_num = 1; break;
     case 14: port_name = 'C'; port_num = 2; break;
+    case 15: port_name = 'C'; port_num = 3; break;
     default: break;
   }
 

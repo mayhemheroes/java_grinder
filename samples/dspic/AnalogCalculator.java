@@ -24,7 +24,9 @@ public class AnalogCalculator implements TimerListener
     // RA1:  SCK
     // RD1:  SDI
     // RD10: LED
-    // RD8:  Analog memory cell High-Z MOSFET control.
+    // RD8:  Analog memory cell DAC switch.
+    // RB13: Analog memory cell ADC switch.
+    // RB14: Analog memory cell clear.
     IOPort3.setPinAsOutput(13);
     IOPort1.setPinAsOutput(0);
     IOPort1.setPinAsOutput(1);
@@ -32,9 +34,14 @@ public class AnalogCalculator implements TimerListener
     IOPort3.setPinAsOutput(1);
     IOPort3.setPinAsOutput(10);
     IOPort3.setPinAsOutput(8);
+    IOPort1.setPinAsOutput(13);
+    IOPort1.setPinAsOutput(14);
 
     // Disconnect memory cell.
-    IOPort3.setPinLow(8);
+    IOPort3.setPinHigh(8);
+    IOPort1.setPinHigh(13);
+    IOPort1.setPinLow(14);
+    //IOPort2.setPinAsHighZ(3);
 
     // Init software SPI.
     IOPort3.setPinHigh(13);
@@ -54,31 +61,44 @@ public class AnalogCalculator implements TimerListener
     // AN12: RC0  (sub)
     // AN13: RC1  (memory)
     // AN14: RC2
+    // AN15: RC3
     ADC.setChannel(0);
     ADC.enable();
 
+    // DEBUG.
+    //IOPort3.setPinAsHighZ(8);
+    //spiSendData(0x3000 | 0xfff, 2);
+    //ADC.setChannel(15);
+    //int test = ADC.read(15);
+    //spiSendData(0x0000, 2);
+    //sendInt(test);
+    // DEBUG.
+
+    // DEBUG.
+    //IOPort2.setPinAsHighZ(3);
+    writeMemory(4095);
+    int test = readMemory();
+    sendInt(test);
+    // DEBUG.
+
     // Setup timer.
-    Timer.setInterval(200, 3);
+    Timer.setInterval(5000, 3);
     Timer.setListener(true);
 
     sendPrompt();
 
-    //int i = 0;
+    int last_interrupt_count = interrupt_count;
 
     while (true)
     {
-/*
-      if ((i & 1) == 0)
+      while (!UART1.isDataAvailable())
       {
-        IOPort3.setPinHigh(10);
+        if (last_interrupt_count != interrupt_count)
+        {
+          readMemory();
+          last_interrupt_count = interrupt_count;
+        }
       }
-        else
-      {
-        IOPort3.setPinLow(10);
-      }
-*/
-
-      while (!UART1.isDataAvailable());
 
       int data = UART1.read();
 
@@ -113,10 +133,10 @@ public class AnalogCalculator implements TimerListener
       if (data == '.')
       {
         sendChar(data);
-        CPU.interruptDisable();
-        //clearMemory();
+        //CPU.interruptDisable();
+        clearMemory();
         writeMemory(value0);
-        CPU.interruptEnable();
+        //CPU.interruptEnable();
         sendPrompt();
         value0 = 0;
         value1 = 0;
@@ -125,10 +145,10 @@ public class AnalogCalculator implements TimerListener
       if (data == '=')
       {
         sendChar(data);
-        CPU.interruptDisable();
+        //CPU.interruptDisable();
         int value = readMemory();
-        CPU.interruptEnable();
         sendInt(value);
+        //CPU.interruptEnable();
         sendPrompt();
         value0 = 0;
         value1 = 0;
@@ -229,6 +249,9 @@ public class AnalogCalculator implements TimerListener
     }
 
     sendDigits(value);
+
+    sendChar('\r');
+    sendChar('\n');
   }
 
   static public void spiSendData(int value, int channel)
@@ -276,45 +299,50 @@ public class AnalogCalculator implements TimerListener
 
   static public void clearMemory()
   {
-    ADC.setChannel(13);
-    IOPort3.setPinHigh(8);
+    IOPort1.setPinHigh(14);
+
+    for (int i = 0; i < 30000; i++)
+    {
+    }
+
+    IOPort1.setPinLow(14);
+/*
+    ADC.setChannel(15);
+    IOPort3.setPinAsOutput(8);
+    IOPort3.setPinLow(8);
 
     while (true)
     {
-      int value = ADC.read(13);
-      if (value == 0) { break; }
+      int value = ADC.read(15);
+      if (value < 100) { break; }
     }
 
-    IOPort3.setPinLow(8);
+    IOPort3.setPinHigh(8);
+*/
   }
 
   static public void writeMemory(int value)
   {
     spiSendData(0x3000 | value, 2);
-    //IOPort2.setPinAsOutput(3);
-    //IOPort2.setPinLow(3);
-    IOPort3.setPinHigh(8);
+    IOPort3.setPinLow(8);
 
-    for (int i = 0; i < 10000; i++)
+    for (int i = 0; i < 30000; i++)
     {
     }
 
-    //IOPort2.setPinAsHighZ(3);
-    IOPort3.setPinLow(8);
+    IOPort3.setPinHigh(8);
     spiSendData(0x0000, 2);
   }
 
   static public int readMemory()
   {
-    ADC.setChannel(13);
+    ADC.setChannel(15);
 
-    IOPort3.setPinHigh(8);
-    int value = ADC.read(13);
-    IOPort3.setPinLow(8);
+    IOPort1.setPinLow(13);
+    int value = ADC.read(15);
+    IOPort1.setPinHigh(13);
 
     writeMemory(value);
-
-value = 100;
 
     return value;
   }
@@ -324,7 +352,7 @@ value = 100;
   public void timerInterrupt()
   {
     // Refresh memory by doing a read operation.
-    readMemory();
+    //readMemory();
 
     // Blink LED in timer interrupt.
     if ((interrupt_count & 1) == 0)
